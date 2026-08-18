@@ -2,11 +2,9 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <!-- Meta viewport sudah benar, mencegah zoom in yang tidak disengaja -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Eksplorasi Grafik Fungsi</title>
     <style>
-        /* Tambahkan box-sizing agar padding tidak merusak lebar elemen */
         * {
             box-sizing: border-box;
         }
@@ -16,13 +14,13 @@
             flex-direction: column;
             align-items: center;
             background-color: #f0f2f5;
-            padding: 10px; /* Padding diperkecil untuk mobile */
+            padding: 10px; 
             margin: 0;
             color: #333;
         }
         .container {
             background: #ffffff;
-            padding: 20px; /* Padding diperkecil untuk mobile */
+            padding: 15px; 
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             max-width: 600px;
@@ -32,29 +30,28 @@
             text-align: center;
             margin-top: 0;
             color: #1a73e8;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
         }
         .controls {
             display: grid;
-            grid-template-columns: 1fr; /* Default 1 kolom untuk layar kecil (HP) */
+            grid-template-columns: 1fr; 
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .control-full {
-            grid-column: 1 / -1; /* Selalu mengambil lebar penuh yang tersedia */
+            grid-column: 1 / -1; 
         }
         label {
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 8px;
             display: flex; 
-            justify-content: space-between; /* Membuat nama label dan angka berjauhan */
+            justify-content: space-between; 
         }
         select, input[type="range"] {
             width: 100%;
-            /* Font 16px penting di iOS untuk mencegah auto-zoom saat dropdown diklik */
             font-size: 16px; 
-            padding: 10px; /* Area sentuh diperbesar */
+            padding: 10px; 
             border: 1px solid #ccc;
             border-radius: 6px;
             background-color: #fff;
@@ -62,7 +59,7 @@
         input[type="range"] {
             padding: 0;
             border: none;
-            height: 30px; /* Area sentuh slider lebih besar */
+            height: 30px; 
         }
         .value-display {
             font-weight: 400;
@@ -77,42 +74,45 @@
             border-radius: 8px;
             margin-bottom: 20px;
             border: 1px dashed #ccc;
-            overflow-x: auto; /* Agar teks panjang bisa digeser, tidak merusak layout */
+            overflow-x: auto; 
+            word-break: break-word;
         }
+        
+        /* --- PERBAIKAN RESPONSIVE CANVAS DI SINI --- */
         .canvas-container {
-            display: flex;
-            justify-content: center;
+            position: relative;
             width: 100%;
+            max-width: 500px; /* Batas maksimal di desktop */
+            margin: 0 auto; /* Posisi di tengah */
+            padding-bottom: 100%; /* Memaksa bentuk kotak 1:1 sempurna di HP */
         }
         canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: #ffffff;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            width: 100%; /* Membuat canvas responsif mengikuti lebar layar */
-            max-width: 500px; /* Batas maksimal ukuran asli */
-            height: auto; /* Tinggi menyesuaikan */
-            aspect-ratio: 1 / 1; /* Memaksa bentuk kanvas tetap persegi 1:1 */
             box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
-            touch-action: none; /* Mencegah layar ikut ter-scroll saat menyentuh area grafik */
+            touch-action: none; /* Mencegah layar tertarik saat menyentuh grafik */
         }
 
         /* MEDIA QUERY: Untuk layar Tablet/Desktop */
         @media (min-width: 600px) {
-            body {
-                padding: 20px;
-            }
-            .container {
-                padding: 30px;
-            }
-            .controls {
-                grid-template-columns: 1fr 1fr; /* Kembali ke 2 kolom di layar lebar */
-            }
-            h2 {
-                font-size: 1.8rem;
-            }
+            body { padding: 20px; }
+            .container { padding: 30px; }
+            .controls { grid-template-columns: 1fr 1fr; }
+            h2 { font-size: 1.8rem; }
             .formula-display {
                 font-size: 18px;
                 padding: 15px;
+            }
+            .canvas-container {
+                /* Di desktop kembali gunakan tinggi statis agar tidak terlalu raksasa */
+                padding-bottom: 0;
+                height: 500px; 
             }
         }
     </style>
@@ -139,7 +139,7 @@
             <label>Koefisien b: <span id="valB" class="value-display">0</span></label>
             <input type="range" id="b" min="-5" max="5" step="0.1" value="0">
         </div>
-        <div id="cControl">
+        <div id="cControl" style="display: none;">
             <label>Koefisien c: <span id="valC" class="value-display">0</span></label>
             <input type="range" id="c" min="-5" max="5" step="0.1" value="0">
         </div>
@@ -152,7 +152,7 @@
     <div class="formula-display" id="formula">y = 1x + 0</div>
 
     <div class="canvas-container">
-        <!-- Resolusi internal tetap 500x500 agar grafik tetap tajam -->
+        <!-- Resolusi render grafik tetap 500x500 (resolusi internal) -->
         <canvas id="graphCanvas" width="500" height="500"></canvas>
     </div>
 </div>
@@ -160,8 +160,8 @@
 <script>
     const canvas = document.getElementById('graphCanvas');
     const ctx = canvas.getContext('2d');
-    const width = canvas.width; // Tetap 500px internal
-    const height = canvas.height; // Tetap 500px internal
+    const width = canvas.width; 
+    const height = canvas.height; 
 
     // Rentang koordinat sumbu X dan Y (-10 hingga 10)
     const range = 10;
@@ -224,7 +224,6 @@
 
         let prevY = null;
 
-        // Iterasi setiap piksel di sumbu X
         for (let px = 0; px <= width; px++) {
             const mathX = (px / scale) - range;
             let mathY = null;
