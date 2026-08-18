@@ -2,23 +2,29 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <!-- Meta viewport sudah benar, mencegah zoom in yang tidak disengaja -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eksplorasi Grafik Fungsi</title>
     <style>
+        /* Tambahkan box-sizing agar padding tidak merusak lebar elemen */
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             background-color: #f0f2f5;
-            padding: 20px;
+            padding: 10px; /* Padding diperkecil untuk mobile */
+            margin: 0;
             color: #333;
         }
         .container {
             background: #ffffff;
-            padding: 30px;
+            padding: 20px; /* Padding diperkecil untuk mobile */
             border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             max-width: 600px;
             width: 100%;
         }
@@ -26,32 +32,37 @@
             text-align: center;
             margin-top: 0;
             color: #1a73e8;
+            font-size: 1.5rem;
         }
         .controls {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 25px;
+            grid-template-columns: 1fr; /* Default 1 kolom untuk layar kecil (HP) */
+            gap: 15px;
+            margin-bottom: 20px;
         }
         .control-full {
-            grid-column: span 2;
+            grid-column: 1 / -1; /* Selalu mengambil lebar penuh yang tersedia */
         }
         label {
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 8px;
-            display: block;
+            display: flex; 
+            justify-content: space-between; /* Membuat nama label dan angka berjauhan */
         }
         select, input[type="range"] {
             width: 100%;
-            padding: 8px;
+            /* Font 16px penting di iOS untuk mencegah auto-zoom saat dropdown diklik */
+            font-size: 16px; 
+            padding: 10px; /* Area sentuh diperbesar */
             border: 1px solid #ccc;
             border-radius: 6px;
-            font-size: 14px;
+            background-color: #fff;
         }
         input[type="range"] {
             padding: 0;
             border: none;
+            height: 30px; /* Area sentuh slider lebih besar */
         }
         .value-display {
             font-weight: 400;
@@ -59,23 +70,50 @@
         }
         .formula-display {
             text-align: center;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             background: #f8f9fa;
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
             border: 1px dashed #ccc;
+            overflow-x: auto; /* Agar teks panjang bisa digeser, tidak merusak layout */
         }
         .canvas-container {
-            text-align: center;
-            position: relative;
+            display: flex;
+            justify-content: center;
+            width: 100%;
         }
         canvas {
             background: #ffffff;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
+            width: 100%; /* Membuat canvas responsif mengikuti lebar layar */
+            max-width: 500px; /* Batas maksimal ukuran asli */
+            height: auto; /* Tinggi menyesuaikan */
+            aspect-ratio: 1 / 1; /* Memaksa bentuk kanvas tetap persegi 1:1 */
             box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+            touch-action: none; /* Mencegah layar ikut ter-scroll saat menyentuh area grafik */
+        }
+
+        /* MEDIA QUERY: Untuk layar Tablet/Desktop */
+        @media (min-width: 600px) {
+            body {
+                padding: 20px;
+            }
+            .container {
+                padding: 30px;
+            }
+            .controls {
+                grid-template-columns: 1fr 1fr; /* Kembali ke 2 kolom di layar lebar */
+            }
+            h2 {
+                font-size: 1.8rem;
+            }
+            .formula-display {
+                font-size: 18px;
+                padding: 15px;
+            }
         }
     </style>
 </head>
@@ -105,7 +143,6 @@
             <label>Koefisien c: <span id="valC" class="value-display">0</span></label>
             <input type="range" id="c" min="-5" max="5" step="0.1" value="0">
         </div>
-        <!-- Kontrol baru untuk Pangkat n -->
         <div id="nControl" style="display: none;">
             <label>Pangkat n: <span id="valN" class="value-display">1</span></label>
             <input type="range" id="n" min="1" max="5" step="1" value="1">
@@ -115,7 +152,7 @@
     <div class="formula-display" id="formula">y = 1x + 0</div>
 
     <div class="canvas-container">
-        <!-- Resolusi kanvas 500x500 piksel -->
+        <!-- Resolusi internal tetap 500x500 agar grafik tetap tajam -->
         <canvas id="graphCanvas" width="500" height="500"></canvas>
     </div>
 </div>
@@ -123,8 +160,8 @@
 <script>
     const canvas = document.getElementById('graphCanvas');
     const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = canvas.width; // Tetap 500px internal
+    const height = canvas.height; // Tetap 500px internal
 
     // Rentang koordinat sumbu X dan Y (-10 hingga 10)
     const range = 10;
@@ -135,7 +172,7 @@
     const inputA = document.getElementById('a');
     const inputB = document.getElementById('b');
     const inputC = document.getElementById('c');
-    const inputN = document.getElementById('n'); // Input pangkat n
+    const inputN = document.getElementById('n'); 
     
     const valA = document.getElementById('valA');
     const valB = document.getElementById('valB');
@@ -170,7 +207,7 @@
             formulaDisplay.innerHTML = `y = ${a}x² ${b >= 0 ? '+' : '-'} ${Math.abs(b)}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)}`;
         } else if (type === 'rational') {
             cControl.style.display = 'block';
-            nControl.style.display = 'block'; // Tampilkan slider n
+            nControl.style.display = 'block'; 
             formulaDisplay.innerHTML = `y = ${a} / (x ${b >= 0 ? '-' : '+'} ${Math.abs(b)})<sup>${n}</sup> ${c >= 0 ? '+' : '-'} ${Math.abs(c)}`;
         }
 
@@ -182,7 +219,7 @@
 
         // 3. Menggambar Garis Fungsi
         ctx.beginPath();
-        ctx.strokeStyle = '#1a73e8'; // Warna biru
+        ctx.strokeStyle = '#1a73e8'; 
         ctx.lineWidth = 3;
 
         let prevY = null;
@@ -197,7 +234,6 @@
             } else if (type === 'quadratic') {
                 mathY = a * Math.pow(mathX, 2) + b * mathX + c;
             } else if (type === 'rational') {
-                // Memutus garis saat mendekati nilai asimtot (x = b) agar tidak terbentuk garis lurus vertikal penghubung
                 if (Math.abs(mathX - b) <= 0.05) {
                     prevY = null;
                     continue;
@@ -209,9 +245,9 @@
                 const py = height / 2 - (mathY * scale);
 
                 if (px === 0 || prevY === null) {
-                    ctx.moveTo(px, py); // Memulai segmen garis baru
+                    ctx.moveTo(px, py); 
                 } else {
-                    ctx.lineTo(px, py); // Menarik garis
+                    ctx.lineTo(px, py); 
                 }
                 prevY = py;
             }
