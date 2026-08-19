@@ -82,9 +82,9 @@
         .canvas-container {
             position: relative;
             width: 100%;
-            max-width: 500px; /* Batas maksimal di desktop */
-            margin: 0 auto; /* Posisi di tengah */
-            padding-bottom: 100%; /* Memaksa bentuk kotak 1:1 sempurna di HP */
+            max-width: 500px;
+            margin: 0 auto;
+            padding-bottom: 100%;
         }
         canvas {
             position: absolute;
@@ -96,7 +96,8 @@
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
-            touch-action: none; /* Mencegah layar tertarik saat menyentuh grafik */
+            touch-action: none; /* Mencegah layar tertarik saat zoom/menyentuh grafik */
+            cursor: grab;
         }
 
         /* MEDIA QUERY: Untuk layar Tablet/Desktop */
@@ -110,7 +111,6 @@
                 padding: 15px;
             }
             .canvas-container {
-                /* Di desktop kembali gunakan tinggi statis agar tidak terlalu raksasa */
                 padding-bottom: 0;
                 height: 500px; 
             }
@@ -121,6 +121,9 @@
 
 <div class="container">
     <h2>Alat Pembuat Grafik Fungsi</h2>
+    <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 15px;">
+        <em>💡 Scroll (Desktop) atau Cubit (HP) pada grafik untuk Zoom In/Out</em>
+    </div>
     
     <div class="controls">
         <div class="control-full">
@@ -163,9 +166,9 @@
     const width = canvas.width; 
     const height = canvas.height; 
 
-    // Rentang koordinat sumbu X dan Y (-10 hingga 10)
-    const range = 10;
-    const scale = width / (range * 2);
+    // Rentang awal koordinat sumbu X dan Y
+    let range = 10;
+    let scale = width / (range * 2);
 
     // Mengambil elemen-elemen UI
     const funcType = document.getElementById('funcType');
@@ -184,6 +187,9 @@
     const nControl = document.getElementById('nControl');
 
     function drawGraph() {
+        // Update skala setiap kali digambar ulang (jika ada zoom)
+        scale = width / (range * 2);
+
         const type = funcType.value;
         const a = parseFloat(inputA.value);
         const b = parseFloat(inputB.value);
@@ -214,7 +220,7 @@
         // 1. Bersihkan Canvas
         ctx.clearRect(0, 0, width, height);
 
-        // 2. Gambar Grid dan Sumbu
+        // 2. Gambar Grid dan Sumbu beserta angkanya
         drawAxes();
 
         // 3. Menggambar Garis Fungsi
@@ -255,25 +261,109 @@
     }
 
     function drawAxes() {
-        ctx.strokeStyle = '#e0e0e0';
         ctx.lineWidth = 1;
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-        // Grid kotak-kotak
-        for (let i = -range; i <= range; i++) {
-            const p = (i + range) * scale;
-            ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, height); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(width, p); ctx.stroke();
+        // Menentukan kelipatan angka sumbu berdasarkan rentang zoom
+        let step = 1;
+        if (range > 50) step = 10;
+        else if (range > 20) step = 5;
+        else if (range > 10) step = 2;
+        else if (range < 3) step = 0.5;
+
+        let startVal = Math.floor(-range);
+        let endVal = Math.ceil(range);
+
+        for (let i = startVal; i <= endVal; i += step) {
+            const pos = (i + range) * scale;
+            
+            // Gambar Garis Grid
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, height); ctx.stroke(); // Vertikal
+            ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(width, pos); ctx.stroke(); // Horizontal
+
+            // Gambar Angka (kecuali di pusat 0,0)
+            if (i !== 0) {
+                ctx.fillStyle = '#666666';
+                
+                // Format angka untuk menghindari desimal panjang (misal 0.5000000001)
+                let textVal = Number.isInteger(i) ? i : i.toFixed(1);
+
+                // Angka Sumbu X
+                ctx.fillText(textVal, pos, height / 2 + 15);
+                
+                // Angka Sumbu Y (dibalik karena Y di canvas ke bawah positif)
+                const posY = height / 2 - (i * scale);
+                ctx.fillText(textVal, width / 2 - 15, posY);
+            }
         }
 
         // Sumbu X dan Y Utama
         ctx.strokeStyle = '#333333';
         ctx.lineWidth = 2;
-        
         ctx.beginPath(); ctx.moveTo(width / 2, 0); ctx.lineTo(width / 2, height); ctx.stroke(); // Y
         ctx.beginPath(); ctx.moveTo(0, height / 2); ctx.lineTo(width, height / 2); ctx.stroke(); // X
+        
+        // Angka 0 di pusat
+        ctx.fillStyle = '#333333';
+        ctx.fillText('0', width / 2 - 10, height / 2 + 15);
     }
 
-    // Event listeners
+    // --- FITUR ZOOM (MOUSE SCROLL) ---
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault(); // Mencegah halaman ikut ter-scroll
+        const zoomSensitivity = 0.1;
+        // Jika scroll ke bawah (zoom out), range bertambah. Ke atas (zoom in), range berkurang.
+        const zoomFactor = e.deltaY > 0 ? (1 + zoomSensitivity) : (1 - zoomSensitivity);
+        
+        range *= zoomFactor;
+        
+        // Batas maksimal dan minimal zoom
+        if (range < 1) range = 1;
+        if (range > 100) range = 100;
+        
+        drawGraph();
+    });
+
+    // --- FITUR ZOOM (PINCH / CUBIT DI HP) ---
+    let initialPinchDistance = null;
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            initialPinchDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && initialPinchDistance !== null) {
+            e.preventDefault(); // Mencegah layar tertarik
+            const currentDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            
+            // Menghitung perubahan jarak jari untuk faktor zoom
+            const zoomFactor = initialPinchDistance / currentDistance;
+            range *= zoomFactor;
+            
+            // Batas maksimal dan minimal zoom
+            if (range < 1) range = 1;
+            if (range > 100) range = 100;
+            
+            initialPinchDistance = currentDistance;
+            drawGraph();
+        }
+    });
+
+    canvas.addEventListener('touchend', () => {
+        initialPinchDistance = null; // Reset saat jari dilepas
+    });
+
+    // Event listeners untuk kontrol UI
     funcType.addEventListener('change', drawGraph);
     inputA.addEventListener('input', drawGraph);
     inputB.addEventListener('input', drawGraph);
